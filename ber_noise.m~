@@ -1,0 +1,50 @@
+function ber_noise
+clear all
+close all
+
+
+
+transmitters= 1;
+DSNRdB= 99;
+% OSNRdB= 99;
+
+FilesPath= '/home/victor/Documentos/PONs/Reporte/Graphs/';
+% cd /home/victor/Documentos/PONs/Reporte/Graphs/
+% INPUTFILE='/home/victor/Documentos/PONs/Reporte/Graphs/AT_1_30.dat';
+% INPUTFILE='/home/victor/Documentos/PONs/Reporte/Graphs/AT_1_25.dat';
+% INPUTFILE='/home/victor/Documentos/PONs/Reporte/Graphs/AT_1_20.dat';
+% INPUTFILE='/home/victor/Documentos/PONs/Reporte/Graphs/AT_1_19.dat';
+% INPUTFILE='/home/victor/Documentos/PONs/Reporte/Graphs/AT_1_15.dat';
+% INPUTFILE='/home/victor/Documentos/PONs/Reporte/Graphs/AT_1_9.dat';
+% INPUTFILE='/home/victor/Documentos/PONs/Reporte/Graphs/AT_1_7.dat';
+INPUTFILE='AT_1_7.dat';
+OUTPUTFILE=['BERSNR',INPUTFILE];
+
+INPUTFILE
+% OSNR parameters [dB] [added \simeq K]
+OSNRSTART= -20;
+OSNRSTEP= 5E-1;   % linear step
+OSNRSTOP= 10;
+
+% DSNR parameters [dB]
+OSNRdB= 99;
+
+
+for OSNRdB= OSNRSTART:OSNRSTEP:OSNRSTOP
+    BitsDisc= noisesim(transmitters, DSNRdB, OSNRdB, INPUTFILE);
+
+    % Input file
+        InpFile= fopen(INPUTFILE,'r');
+        InBitString= fread(InpFile,'char');
+        fclose(InpFile);
+
+    % error count 
+    count= size(BitsDisc,1);
+    errors= 0;
+    for i=1:size(BitsDisc,1)
+        if (InBitString(i)~=BitsDisc(i) )
+            errors= errors+ 1;
+        end
+    end
+    BER= errors/ count;
+end

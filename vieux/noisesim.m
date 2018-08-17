@@ -1,0 +1,62 @@
+function BitsDisc=noisesim(transmitters, DSNRdB, OSNRdB, INPUTFILE)
+% cd ~/Documentos/PONs/eccchain/matlab
+
+%% Inputs
+
+% Input file
+%    InpFile= fopen('~/Documentos/PONs/Reporte/Graphs/AT_1_7.dat','r');
+    InpFile= fopen(INPUTFILE,'r');
+    InBitString= fread(InpFile,'char');
+    fclose(InpFile);
+
+DSNR= 10^( DSNRdB/ 10);             % Argument: DSNR [dB] -> DSNR [1]
+OSNR= 10^( OSNRdB/ 10);             % Argument: OSNR [dB] -> OSNR [1]
+
+
+
+%% Parameters
+% TRANSMISSION SYSTEM DEFINITION
+Carrier= struct;              % System parameters struct
+Carrier.NPtos_Bit= 2^6;      % points for each bit slot
+Carrier.N_Bits= size(InBitString,1);
+Carrier.NPtos_Tot= Carrier.NPtos_Bit* Carrier.N_Bits;   % Total # points
+Carrier.Duty_Cycle= 1.0/3.0;
+Carrier.B= 10E9;            % bit rate [bits/s] (10 Gbits/s)
+Carrier.dt= 1/ (Carrier.B* Carrier.NPtos_Bit );
+Carrier.Bit_Slot= 1/ Carrier.B;   % 1/B B: bit rate [s]
+
+% FIBRE DESCRIPTION
+Fibre= struct;
+Fibre.alpha= 0.21;					% [dB/km] Corning ClearCurve ITU-T G.652
+Fibre.length= 20;					% [km] max total path length
+
+% GAUSSIAN PULSE DEFINITION
+gauss.P_0= 2.5E-3;						% [mW] www.afop.com/pdf/Active%20Devices/GE-PON%20BOSA.pdf
+gauss.A_0= sqrt( gauss.P_0);			% [sqrt{mW}]
+gauss.FWHM_pow= Carrier.Duty_Cycle* Carrier.Bit_Slot;			% [s] in power (|E|^2)
+% gauss.FWHM_pow= 5.887050112577374E-12;			% [s] in electric field amplitude
+gauss.T_0_amp= gauss.FWHM_pow/(2* sqrt(log(2) ) );	% [s]
+% gauss.T_0_amp= 2.5E-12;					% [s]
+% gauss.T_0_amp= 0.25* Carrier.Duty_Cycle* Carrier.Bit_Slot;	% as Duty_Cycle fraction 
+gauss.m= 4;                             % gaussian=1
+gauss.r_ex= -10.0;					% [dB] Extinction ratio [-10 ~ -15 Grosz priv. comm. 090210]
+
+
+%% Main
+
+[RZPulsesTrainTime, RZPulsesTrain, RZBit0, RZBit1Gauss, Pmean, OSigmaNoise]=Bits2Pulses(Carrier, gauss, InBitString, OSNR, transmitters);
+
+%FIBRE ATTENUATION
+    FAtt= 1.0;
+    % FAtt= exp(-0.5* 10^(Fibre.alpha/ 10)* Fibre.length );
+    % printf("FAtt=\t%e\n",FAtt);
+    for i= 1:Carrier.NPtos_Tot
+        RZPulsesTrain(i)= RZPulsesTrain(i)* FAtt; 
+    end
+
+% DETECTOR THRESHOLD
+    [Id, DSigmaNoise]= Threshold1(Carrier, RZBit0, RZBit1Gauss, OSigmaNoise, DSNR, Pmean, FAtt);
+    
+% PULSES -> BITS
+    BitsDisc= Pulses2Bits( Carrier, RZPulsesTrain, RZPulsesTrainTime, Id, DSigmaNoise);
+    

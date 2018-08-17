@@ -1,0 +1,6 @@
+function EDFAfit
+
+c=load('EDFADatasheet.csv');
+PindBm
+f= fittype(,PindBm);
+cfun= fit(c(:,1),c(:,2));

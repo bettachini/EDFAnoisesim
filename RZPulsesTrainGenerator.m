@@ -1,0 +1,67 @@
+function [RZPulsesTrainTime, RZPulsesTrain, RZBit0, RZBit1Gauss, LOff]=RZPulsesTrainGenerator(Carrier, gauss, InBitString, transmitters)
+
+TrainLength= size(InBitString,1);
+
+% Extinction ratio base amplitude level
+    LOff= gauss.A_0* 10^( gauss.r_ex/ 20);			% optical amplitude for '0'
+    %LOff= 0.0;						% TEST: no extinction ratio
+
+% Time vector
+    RZPulsesTrainTime= zeros(TrainLength* Carrier.NPtos_Bit,1);
+    aux=( (1.5- Carrier.NPtos_Bit)/ (1- Carrier.NPtos_Bit) );
+    for i=1: Carrier.NPtos_Bit          % GUARDA NUMERACION MATLAB
+        RZPulsesTrainTime(i)= Carrier.dt* ( aux* i- 0.5) ;     % time for one slot
+    end
+    for k= 1: TrainLength
+        for i= 1: Carrier.NPtos_Bit
+            RZPulsesTrainTime( (k- 1)* Carrier.NPtos_Bit+ i)= RZPulsesTrainTime(i)+ Carrier.Bit_Slot* (k- 1);		% copies time to following slots
+        end
+    end
+
+% Pulse amplitude addition over base [RZ]
+    RZBit1Gauss= zeros(Carrier.NPtos_Bit,1);
+	for i= 1: Carrier.NPtos_Bit
+        RZBit1Gauss(i)= ( gauss.A_0- LOff)* exp(-0.5* ( ( ( RZPulsesTrainTime(i)- (0.25* Carrier.Bit_Slot) )/ gauss.T_0_amp) )^(2* gauss.m ) );	% SuperGaussian
+        RZBit1Gauss(i)= RZBit1Gauss(i)+ LOff;       % adds for one active Tx
+    end
+    
+% % Pulse amplitude addition over base [NRZ]
+%     for i=0; Carrier.NPtos_Bit
+%         RZBit1Gauss(i)= gauss.A_0;      % Square [NRZ]
+%     end
+
+% RZ PULSES TRAIN (Amplitude)
+  RZPulsesTrain= zeros(TrainLength* Carrier.NPtos_Bit,1);
+  k= 0;
+  while(k<TrainLength)
+    senders= InBitString(k+1);
+    for i= 1: Carrier.NPtos_Bit
+      % Optical intensity addition
+      RZPulsesTrain(k* Carrier.NPtos_Bit+ i)= (transmitters- senders)* (LOff * LOff );
+      RZPulsesTrain(k* Carrier.NPtos_Bit+ i)= RZPulsesTrain(k* Carrier.NPtos_Bit+ i)+ senders* (RZBit1Gauss(i)* RZBit1Gauss(i) );
+      RZPulsesTrain(k* Carrier.NPtos_Bit+ i)= sqrt( RZPulsesTrain(k* Carrier.NPtos_Bit+ i) ); 
+
+%       % Electric field addition is assumed instead of a intensity sum
+%       RZPulsesTrain[k*(*Carrier).NPtos_Bit+i]= (float) RZBit0[i];			// '0' base
+%       RZPulsesTrain[k*(*Carrier).NPtos_Bit+i]+= (float) senders* RZBit1Gauss[i];	// '1' pulses addition
+%       RZPulsesTrain[k*(*Carrier).NPtos_Bit+i]= sqrt(RZPulsesTrain[k*(*Carrier).NPtos_Bit+i]);
+    end
+    k= k+ 1;
+  end
+
+% '0' SLOT AMPLITUDE
+  RZBit0= zeros(Carrier.NPtos_Bit,1);
+  for i= 1: Carrier.NPtos_Bit
+      RZBit0(i)= sqrt( transmitters )* LOff;	% base level for multiple transmitters
+  end
+  
+% '1' SLOT AMPLITUDE [NRZ/RZ]
+  for i=1: Carrier.NPtos_Bit
+    RZBit1Gauss(i)= sqrt( RZBit1Gauss(i)* RZBit1Gauss(i) +  (transmitters- 1) * ( LOff * LOff) );
+  end
+
+	% WriteFile("amplitude0.dat", PulsesTrainTime, RZBit0, (*Carrier).NPtos_Bit);	// TEST bitslot '0'
+	% WriteFile("amplitude1.dat", PulsesTrainTime, RZBit1Gauss, (*Carrier).NPtos_Bit);	// TEST bitslot '1'
+	% WriteFile("RZPulsesTrain.dat", PulsesTrainTime, RZPulsesTrain, (*Carrier).NPtos_Tot);	// TEST train to file
+    % for(i=0; i<(*Carrier).NPtos_Tot; i++)
+    % printf("%.3e\t%.3e\n",RZPulsesTrainTime[i],RZPulsesTrain[i]);	// TEST
